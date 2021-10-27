@@ -17,6 +17,7 @@ import random, time, util
 from util import manhattanDistance
 from game import Directions
 import game
+import distanceCalculator
 
 #################
 # Team creation #
@@ -46,73 +47,37 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Agents #
 ##########
 
-class Node:
-  def __init__(self, state, action, cost, parent):
-    self.state = state
-    self.action = action
-    self.cost = cost
-    self.parent = parent
-
-  def getActionPath(self):
-    if self.parent is None:
-      return []
-    else:
-      action_path = self.parent.getActionPath()
-      action_path.append(self.action)
-      return action_path
-
-def aStarSearch(index, gameState, goalState):
-  current_node = Node(gameState.getAgentPosition(index), None, 0, None)
-  closed = set([])
-  fringe = util.PriorityQueue()
-  fringe.push(current_node, current_node.cost)
-  print("NEW")
-  while True:
-    if fringe.isEmpty():
-      return False
-
-    node = fringe.pop()
-
-    if node.state not in closed:
-      closed.add(node.state)
-
-      if node.state == goalState:
-        return node.getActionPath()
-
-      for action in gameState.getLegalActions(index):
-        s = gameState.generateSuccessor(index, action).getAgentPosition(index)
-        print("-------------------")
-        print("Old state: " + str(node.state))
-        print("Old state: " + str(gameState.getAgentPosition(index)))
-        print("Action: " + str(action))
-        print("New state: " + str(s))
-        #joe = gameState.generateSuccessor(index, action)
-        successor_node = Node(s, action, 1, node)
-        if successor_node.state not in closed:
-          fringe.push(successor_node, successor_node.cost + manhattanDistance(successor_node.state, goalState))
-
 class defensiveAgent(CaptureAgent):
-  # couple = []
-  # coupleMade = False
-  # for oponentIndex in getOpponents():
-  #   if getAgentPosition(oponentIndex) in getFoodYouAreDefending():
-  #     couple = [CaptureAgent.index, oponentIndex]
-  #     cupleMade = True
-  #     fightThisMotherFucker(couple)
-
-  # def fightThisMotherFucker(couple):
-  #   getShortestPath(getAgentPosition(couple[1])
-
   def registerInitialState(self, gameState):
     CaptureAgent.registerInitialState(self, gameState)
 
   def chooseAction(self, gameState):
-    nearest_food = min(gameState.getRedFood().asList(), key=lambda x: manhattanDistance(gameState.getAgentPosition(self.index), x))
-    #for o in CaptureAgent.getOpponents(gameState):
-    print(aStarSearch(self.index, gameState, nearest_food))
+    bestDistance = float('inf')
+    bestActions = []
 
-    actions = gameState.getLegalActions(self.index)
-    return random.choice(actions)
+    for action in gameState.getLegalActions(self.index):
+      nearest_food_position = min(gameState.getRedFood().asList(),
+                                  key=lambda x: self.getMazeDistance(self.getSuccessor(gameState, action), x))
+      nearest_food_distance = self.getMazeDistance(self.getSuccessor(gameState, action), nearest_food_position)
+      print(action + ": " + str(nearest_food_distance))
+
+      if nearest_food_distance < bestDistance:
+        bestActions.clear()
+        bestActions.append(action)
+        bestDistance = nearest_food_distance
+      elif nearest_food_distance == bestDistance:
+        bestActions.append(action)
+
+    print(bestActions)
+    return random.choice(bestActions)
+
+  def getSuccessor(self, gameState, action):
+    """
+    Finds the following position after taking an action.
+    """
+    successor = gameState.generateSuccessor(self.index, action)
+    pos = successor.getAgentState(self.index).getPosition()
+    return pos
 
 
 class offensiveAgent(CaptureAgent):
