@@ -16,6 +16,7 @@ from captureAgents import CaptureAgent
 import random, time, util
 from util import manhattanDistance
 from game import Directions
+from util import nearestPoint
 import game
 import distanceCalculator
 
@@ -24,7 +25,7 @@ import distanceCalculator
 #################
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first = 'offensiveAgent', second = 'defensiveAgent'):
+               first = 'AlphaBetaAgent', second = 'AlphaBetaAgent'):
   """
   This function should return a list of two agents that will form the
   team, initialized using firstIndex and secondIndex as their agent
@@ -47,89 +48,114 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Agents #
 ##########
 
-class defensiveAgent(CaptureAgent):
+class AlphaBetaAgent(CaptureAgent):
+
   def registerInitialState(self, gameState):
+    self.start = gameState.getAgentPosition(self.index)
     CaptureAgent.registerInitialState(self, gameState)
 
   def chooseAction(self, gameState):
-    bestDistance = float('inf')
-    bestActions = []
+    """
+      Returns the minimax action using self.depth and self.evaluationFunction
+    """
+
+    def alphabeta(state, depth, agent, alpha, beta):
+      if state.isOver():
+        return self.evaluationFunction(state)
+
+      if agent == state.getNumAgents():  # If this is the last agent
+        if depth == 2:  # If we're at the required depth
+          return self.evaluationFunction(state)
+        else:  # Go one level deeper
+          return alphabeta(state, depth + 1, 0, alpha, beta)
+
+      if state.getAgentPosition(agent) is not None: # Check if agent is observable
+        if len(state.getLegalActions(agent)) == 0:  # If the node doesn't have any successors (a terminal node)
+          return self.evaluationFunction(state)
+
+      if agent in self.getTeam(state):  # If agent is max
+        value = float('-inf')
+        for action in state.getLegalActions(agent):
+          successor = state.generateSuccessor(agent, action)
+          value = max([value, alphabeta(successor, depth, agent + 1, alpha, beta)])
+          if value > beta:
+            return value
+          alpha = max([alpha, value])
+        return value
+      else:  # If agent is min
+        value = float('inf')
+        if state.getAgentPosition(agent) is not None:
+          for action in state.getLegalActions(agent):
+            successor = state.generateSuccessor(agent, action)
+            value = min([value, alphabeta(successor, depth, agent + 1, alpha, beta)])
+
+            if value < alpha:  # If the value is lower than MAX's best option on path to root, return the value
+              return value
+            beta = min([beta, value])
+        else:
+          value = min([value, alphabeta(state, depth, agent + 1, alpha, beta)])
+          if value < alpha:  # If the value is lower than MAX's best option on path to root, return the value
+            return value
+          beta = min([beta, value])
+
+        return value
+
+    best = None
+    alpha = float('-inf')  # -inf
+    beta = float('inf')  # +inf
 
     for action in gameState.getLegalActions(self.index):
-      nearest_food_position = min(gameState.getRedFood().asList(),
-                                  key=lambda x: self.getMazeDistance(self.getSuccessor(gameState, action), x))
-      nearest_food_distance = self.getMazeDistance(self.getSuccessor(gameState, action), nearest_food_position)
-      print(action + ": " + str(nearest_food_distance))
+      successor = gameState.generateSuccessor(self.index, action)
+      if(self.index != gameState.getNumAgents()):
+        value = alphabeta(successor, 1, self.index+1, alpha, beta)
+      else:
+        value = alphabeta(successor, 1, 0, alpha, beta)
 
-      if nearest_food_distance < bestDistance:
-        bestActions.clear()
-        bestActions.append(action)
-        bestDistance = nearest_food_distance
-      elif nearest_food_distance == bestDistance:
-        bestActions.append(action)
 
-    print(bestActions)
-    return random.choice(bestActions)
+      if value > alpha:
+        alpha = value
+        best = action
 
-  def getSuccessor(self, gameState, action):
+    return best
+
+  def evaluationFunction(self, currentGameState):
     """
-    Finds the following position after taking an action.
+      The evaluation function
+      minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
+      foodLeft: The amount of food left
+      ghostNear: If a ghost is within a distance of 5
     """
-    successor = gameState.generateSuccessor(self.index, action)
-    pos = successor.getAgentState(self.index).getPosition()
-    return pos
+    foodLeft = len(self.getFood(currentGameState).asList())
 
+    if currentGameState.isOver():
+      return 1000000
 
-class offensiveAgent(CaptureAgent):
-  def registerInitialState(self, gameState):
-    CaptureAgent.registerInitialState(self, gameState)
+    if foodLeft > 2:
+      weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0, 'ghostNear': -10.0}
+      features = util.Counter()
 
-  def chooseAction(self, gameState):
-    actions = gameState.getLegalActions(self.index)
-    return random.choice(actions)
+      features['foodLeft'] = foodLeft
+      features['ghostNear'] = 0
 
-class DummyAgent(CaptureAgent):
-  """
-  A Dummy agent to serve as an example of the necessary agent structure.
-  You should look at baselineTeam.py for more details about how to
-  create an agent as this is the bare minimum.
-  """
+      for agent in range(currentGameState.getNumAgents()-1):
+        if agent in self.getTeam(currentGameState):
+          features['minimumFoodDistance'] += min(self.getMazeDistance(currentGameState.getAgentPosition(agent), x) for x in self.getFood(currentGameState).asList())
 
-  def registerInitialState(self, gameState):
-    """
-    This method handles the initial setup of the
-    agent to populate useful fields (such as what team
-    we're on).
+          for enemyAgent in self.getOpponents(currentGameState):
+            agentPosition = currentGameState.getAgentPosition(enemyAgent)
+            if agentPosition is not None:
+              features['ghostNear'] = 1
+        #else:
+          #return -10
 
-    A distanceCalculator instance caches the maze distances
-    between each pair of positions, so your agents can use:
-    self.distancer.getDistance(p1, p2)
+      return features * weights
+    else:
+      weights = {'distanceToHome': -1.0}
+      features = util.Counter()
 
-    IMPORTANT: This method may run for at most 15 seconds.
-    """
+      for agent in range(currentGameState.getNumAgents()-1):
+        if agent in self.getTeam(currentGameState):
+          features['distanceToHome'] += self.getMazeDistance(currentGameState.getAgentPosition(agent), currentGameState.getInitialAgentPosition(agent))
 
-    '''
-    Make sure you do not delete the following line. If you would like to
-    use Manhattan distances instead of maze distances in order to save
-    on initialization time, please take a look at
-    CaptureAgent.registerInitialState in captureAgents.py.
-    '''
-    CaptureAgent.registerInitialState(self, gameState)
-
-    '''
-    Your initialization code goes here, if you need any.
-    '''
-
-
-  def chooseAction(self, gameState):
-    """
-    Picks among actions randomly.
-    """
-    actions = gameState.getLegalActions(self.index)
-
-    '''
-    You should change this in your own agent.
-    '''
-
-    return random.choice(actions)
+      return features * weights + 1000
 
