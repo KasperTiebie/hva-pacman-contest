@@ -61,17 +61,17 @@ class AlphaBetaAgent(CaptureAgent):
 
     def alphabeta(state, depth, agent, alpha, beta):
       if state.isOver():
-        return self.evaluationFunction(state)
+        return self.evaluationFunction(state, agent)
 
       if agent == state.getNumAgents():  # If this is the last agent
-        if depth == 2:  # If we're at the required depth
-          return self.evaluationFunction(state)
+        if depth == 3:  # If we're at the required depth
+          return self.evaluationFunction(state, agent)
         else:  # Go one level deeper
           return alphabeta(state, depth + 1, 0, alpha, beta)
 
       if state.getAgentPosition(agent) is not None: # Check if agent is observable
         if len(state.getLegalActions(agent)) == 0:  # If the node doesn't have any successors (a terminal node)
-          return self.evaluationFunction(state)
+          return self.evaluationFunction(state, agent)
 
       if agent in self.getTeam(state):  # If agent is max
         value = float('-inf')
@@ -96,7 +96,6 @@ class AlphaBetaAgent(CaptureAgent):
           value = min([value, alphabeta(state, depth, agent + 1, alpha, beta)])
           if value < alpha:  # If the value is lower than MAX's best option on path to root, return the value
             return value
-          beta = min([beta, value])
 
         return value
 
@@ -118,44 +117,93 @@ class AlphaBetaAgent(CaptureAgent):
 
     return best
 
-  def evaluationFunction(self, currentGameState):
+  def evaluationFunction(self, currentGameState, agent):
+    print(agent)
+    if agent == 3:
+      print("JOE")
+      return self.evaluateDefensive(currentGameState)
+    else:
+      return self.evaluateOffensive(currentGameState)
+
+  def evaluateOffensive(self, currentGameState):
     """
-      The evaluation function
-      minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
-      foodLeft: The amount of food left
-      ghostNear: If a ghost is within a distance of 5
-    """
+          The evaluation function
+          minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
+          foodLeft: The amount of food left
+          ghostNear: If a ghost is within a distance of 5
+        """
     foodLeft = len(self.getFood(currentGameState).asList())
 
     if currentGameState.isOver():
-      return 1000000
+      if foodLeft <= 2:  # If our team is winning
+        return 1000000  # Make sure that happens by returning a high value
+      elif len(self.getFoodYouAreDefending(currentGameState).asList()) <= 2:  # If the opposing team is winning
+        return -1000000  # Make sure that doesn't happen by returning a low value
 
     if foodLeft > 2:
-      weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0, 'ghostNear': -10.0}
+      weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0, 'ghostNear': -100.0}
       features = util.Counter()
 
       features['foodLeft'] = foodLeft
       features['ghostNear'] = 0
 
-      for agent in range(currentGameState.getNumAgents()-1):
-        if agent in self.getTeam(currentGameState):
-          features['minimumFoodDistance'] += min(self.getMazeDistance(currentGameState.getAgentPosition(agent), x) for x in self.getFood(currentGameState).asList())
+      for agent in self.getTeam(currentGameState):
+        agentPosition = currentGameState.getAgentPosition(agent)
+        features['minimumFoodDistance'] += min(
+          self.getMazeDistance(agentPosition, x) for x in self.getFood(currentGameState).asList())
 
-          for enemyAgent in self.getOpponents(currentGameState):
-            agentPosition = currentGameState.getAgentPosition(enemyAgent)
-            if agentPosition is not None:
+        for enemyAgent in self.getOpponents(currentGameState):
+          enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
+          if enemyAgentPosition is not None:
+            if self.getMazeDistance(enemyAgentPosition, agentPosition) <= 2:
               features['ghostNear'] = 1
-        #else:
-          #return -10
 
+      #print(features * weights)
       return features * weights
     else:
       weights = {'distanceToHome': -1.0}
       features = util.Counter()
 
-      for agent in range(currentGameState.getNumAgents()-1):
+      for agent in range(currentGameState.getNumAgents() - 1):
         if agent in self.getTeam(currentGameState):
-          features['distanceToHome'] += self.getMazeDistance(currentGameState.getAgentPosition(agent), currentGameState.getInitialAgentPosition(agent))
+          features['distanceToHome'] += self.getMazeDistance(currentGameState.getAgentPosition(agent),
+                                                             currentGameState.getInitialAgentPosition(agent))
 
       return features * weights + 1000
+
+  def evaluateDefensive(self, currentGameState):
+    """
+              The evaluation function
+              minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
+              foodLeft: The amount of food left
+              ghostNear: If a ghost is within a distance of 5
+            """
+    layoutWidth = currentGameState.getWalls()
+    #print(layoutWidth.asList()[0])
+    foodDefendingLeft = len(self.getFoodYouAreDefending(currentGameState).asList())
+
+    if currentGameState.isOver():
+      if foodDefendingLeft <= 2:  # If the opposing team is winning
+        return -1000000  # Make sure that doesn't happen by returning a low
+      elif len(self.getFood(currentGameState).asList()) <= 2:  # If our team is winning
+        return 1000000  # Make sure that happens by returning a high value
+
+    weights = {'foodDefendingLeft': 5.0, 'distanceToGhost': -5.0}
+    features = util.Counter()
+
+    features['foodDefendingLeft'] = foodDefendingLeft
+    features['distanceToGhost'] = 15
+
+    for agent in self.getTeam(currentGameState):
+      agentPosition = currentGameState.getAgentPosition(agent)
+
+      for enemyAgent in self.getOpponents(currentGameState):
+        enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
+        if enemyAgentPosition is not None:
+          distanceToEnemyAgent = self.getMazeDistance(enemyAgentPosition, agentPosition)
+          if distanceToEnemyAgent < features['distanceToGhost']:
+            features['distanceToGhost'] = distanceToEnemyAgent
+
+    print(features * weights)
+    return features * weights
 
