@@ -20,46 +20,60 @@ from util import nearestPoint
 import game
 import distanceCalculator
 
+
 #################
 # Team creation #
 #################
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first = 'offensiveAgent', second = 'defensiveAgent'):
+               first='offensiveAgent', second='defensiveAgent'):
   """
-  This function should return a list of two agents that will form the
-  team, initialized using firstIndex and secondIndex as their agent
-  index numbers.  isRed is True if the red team is being created, and
-  will be False if the blue team is being created.
+This function should return a list of two agents that will form the
+team, initialized using firstIndex and secondIndex as their agent
+index numbers.  isRed is True if the red team is being created, and
+will be False if the blue team is being created.
 
-  As a potentially helpful development aid, this function can take
-  additional string-valued keyword arguments ("first" and "second" are
-  such arguments in the case of this function), which will come from
-  the --redOpts and --blueOpts command-line arguments to capture.py.
-  For the nightly contest, however, your team will be created without
-  any extra arguments, so you should make sure that the default
-  behavior is what you want for the nightly contest.
-  """
+As a potentially helpful development aid, this function can take
+additional string-valued keyword arguments ("first" and "second" are
+such arguments in the case of this function), which will come from
+the --redOpts and --blueOpts command-line arguments to capture.py.
+For the nightly contest, however, your team will be created without
+any extra arguments, so you should make sure that the default
+behavior is what you want for the nightly contest.
+"""
 
   # The following line is an example only; feel free to change it.
   return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
+
 ##########
 # Agents #
 ##########
+maxFood = 0
+hasBeenHome = True
+
 
 class offensiveAgent(CaptureAgent):
 
   def registerInitialState(self, gameState):
     self.start = gameState.getAgentPosition(self.index)
+    self.totalFood = len(self.getFood(gameState).asList())
+
+    self.layoutWidth = max(gameState.getWalls().asList(), key=lambda x: x[0])[0]  # Returns the wall with the highest X value
+    self.layoutHeight = max(gameState.getWalls().asList(), key=lambda x: x[1])[1]  # Returns the wall with the highest Y value
+    self.dividingX = self.layoutWidth / 2  # Returns the X value of the diving line
+    self.dividingY = round(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
+    self.isRed = gameState.isOnRedTeam(self.index)
+
     CaptureAgent.registerInitialState(self, gameState)
 
   def chooseAction(self, gameState):
     """
-      Returns the minimax action using self.depth and self.evaluationFunction
+    Returns the minimax action using self.depth and self.evaluationFunction
     """
 
     def alphabeta(state, depth, agent, alpha, beta):
+
       if state.isOver():
         return self.evaluationFunction(state)
 
@@ -69,7 +83,7 @@ class offensiveAgent(CaptureAgent):
         else:  # Go one level deeper
           return alphabeta(state, depth + 1, 0, alpha, beta)
 
-      if state.getAgentPosition(agent) is not None: # Check if agent is observable
+      if state.getAgentPosition(agent) is not None:  # Check if agent is observable
         if len(state.getLegalActions(agent)) == 0:  # If the node doesn't have any successors (a terminal node)
           return self.evaluationFunction(state)
 
@@ -105,8 +119,9 @@ class offensiveAgent(CaptureAgent):
 
     for action in gameState.getLegalActions(self.index):
       successor = gameState.generateSuccessor(self.index, action)
-      if(self.index != gameState.getNumAgents()):
-        value = alphabeta(successor, 1, self.index+1, alpha, beta)
+      successor.getAgentPosition(self.index)
+      if self.index is not gameState.getNumAgents():
+        value = alphabeta(successor, 1, self.index + 1, alpha, beta)
       else:
         value = alphabeta(successor, 1, 0, alpha, beta)
 
@@ -116,13 +131,19 @@ class offensiveAgent(CaptureAgent):
 
     return best
 
+  def isOnOwnSide(self, gameState):
+    if self.isRed:
+      return gameState.getAgentPosition(self.index)[0] < self.dividingX
+    else:
+      return gameState.getAgentPosition(self.index)[0] > self.dividingX
+
   def evaluationFunction(self, currentGameState):
     """
-              The evaluation function
-              minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
-              foodLeft: The amount of food left
-              ghostNear: If a ghost is within a distance of 2
-            """
+          The evaluation function
+          minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
+          foodLeft: The amount of food left
+          ghostNear: If a ghost is within a distance of 2
+        """
     foodLeft = len(self.getFood(currentGameState).asList())
 
     # If the game is over at this state
@@ -132,7 +153,7 @@ class offensiveAgent(CaptureAgent):
       elif len(self.getFoodYouAreDefending(currentGameState).asList()) <= 2:  # If the opposing team is winning
         return -1000000  # Make sure that doesn't happen by returning a low value
 
-    # Collect more food if the foodLeft is > 2
+    # Collect more food if the foodLeft is > 2 and the agent isn't holding more than 2 food
     if foodLeft > 2:
       weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0, 'ghostNear': -100.0}
       features = util.Counter()
@@ -147,40 +168,50 @@ class offensiveAgent(CaptureAgent):
       for enemyAgent in self.getOpponents(currentGameState):
         enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
         if enemyAgentPosition is not None:
-          if self.getMazeDistance(enemyAgentPosition, agentPosition) <= 2:
+          if self.getMazeDistance(enemyAgentPosition, agentPosition) <= 1:
             features['ghostNear'] = 1
 
       return features * weights
 
     # Go home to return the food
     else:
-      weights = {'distanceToHome': -1.0}
+      weights = {'distanceToHome': -1.0, 'distanceToGhost': -5.0}
       features = util.Counter()
 
-      for agent in range(currentGameState.getNumAgents() - 1):
-        if agent in self.getTeam(currentGameState):
-          features['distanceToHome'] += self.getMazeDistance(currentGameState.getAgentPosition(agent),
-                                                             currentGameState.getInitialAgentPosition(agent))
+      features['distanceToHome'] = self.getMazeDistance(currentGameState.getAgentPosition(self.index),
+                                      currentGameState.getInitialAgentPosition(self.index))
+
+      # Loops through all enemies and sets 'distanceToGhost' equal to the lowest distance to a ghost
+      agentPosition = currentGameState.getAgentPosition(self.index)
+      for enemyAgent in self.getOpponents(currentGameState):
+        enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
+        if enemyAgentPosition is not None:
+          distanceToEnemyAgent = self.getMazeDistance(enemyAgentPosition, agentPosition)
+          if distanceToEnemyAgent < features['distanceToGhost']:
+            features['distanceToGhost'] = distanceToEnemyAgent
 
       return features * weights + 1000
+
 
 class defensiveAgent(CaptureAgent):
 
   def registerInitialState(self, gameState):
     self.start = gameState.getAgentPosition(self.index)
-    self.layoutWidth = max(gameState.getWalls().asList(), key=lambda x: x[0])[0]  # Returns the wall with the highest X value
-    self.layoutHeight = max(gameState.getWalls().asList(), key=lambda x: x[1])[1] # Returns the wall with the highest Y value
-    self.dividingX = round(self.layoutWidth / 2) # Returns the X value of the diving line
-    self.dividingY = round(self.layoutHeight / 2) # Returns the Y value of the imaginary diving Y line
+    self.layoutWidth = max(gameState.getWalls().asList(), key=lambda x: x[0])[
+      0]  # Returns the wall with the highest X value
+    self.layoutHeight = max(gameState.getWalls().asList(), key=lambda x: x[1])[
+      1]  # Returns the wall with the highest Y value
+    self.dividingX = round(self.layoutWidth / 2)  # Returns the X value of the diving line
+    self.dividingY = round(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
     self.isRed = gameState.isOnRedTeam(self.index)
     CaptureAgent.registerInitialState(self, gameState)
 
     # Marks the middle of the board
-    self.debugDraw(cells=[(self.dividingX, self.dividingY)], color=[1,0,0])
+    self.debugDraw(cells=[(self.dividingX, self.dividingY)], color=[1, 0, 0])
 
   def chooseAction(self, gameState):
     """
-      Returns the minimax action using self.depth and self.evaluationFunction
+    Returns the minimax action using self.depth and self.evaluationFunction
     """
 
     def alphabeta(state, depth, agent, alpha, beta):
@@ -229,7 +260,7 @@ class defensiveAgent(CaptureAgent):
 
     for action in gameState.getLegalActions(self.index):
       successor = gameState.generateSuccessor(self.index, action)
-      if (self.index != gameState.getNumAgents()):
+      if self.index is not gameState.getNumAgents():
         value = alphabeta(successor, 1, self.index + 1, alpha, beta)
       else:
         value = alphabeta(successor, 1, 0, alpha, beta)
@@ -240,13 +271,19 @@ class defensiveAgent(CaptureAgent):
 
     return best
 
+  def isOnOwnSide(self, gameState):
+    if self.isRed:
+      return gameState.getAgentPosition(self.index)[0] < self.dividingX
+    else:
+      return gameState.getAgentPosition(self.index)[0] > self.dividingX
+
   def evaluationFunction(self, currentGameState):
     """
-              The evaluation function
-              minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
-              foodLeft: The amount of food left
-              ghostNear: If a ghost is within a distance of 2
-            """
+          The evaluation function
+          minimumFoodDistanceSum: The sum of the distance to the nearest food pellet of each agent
+          foodLeft: The amount of food left
+          ghostNear: If a ghost is within a distance of 2
+        """
 
     foodDefendingLeft = len(self.getFoodYouAreDefending(currentGameState).asList())
 
@@ -257,12 +294,13 @@ class defensiveAgent(CaptureAgent):
       elif len(self.getFood(currentGameState).asList()) <= 2:  # If our team is winning
         return 1000000  # Make sure that happens by returning a high value
 
-    weights = {'foodDefendingLeft': 5.0, 'ghostNear': 50.0, 'distanceToGhost': -5.0, 'dividingLineCrossed': -10000, 'distanceToDividingLine': -1.0}
+    weights = {'foodDefendingLeft': 30, 'distanceToEnemy': -5.0, 'isOnEnemySide': -10000,
+               'distanceToDividingLine': -0.1}
     features = util.Counter()
 
     features['foodDefendingLeft'] = foodDefendingLeft
-    #features['distanceToGhost'] = 15
     features['distanceToDividingLine'] = float('inf')
+    features['distanceToEnemy'] = 20
 
     agentPosition = currentGameState.getAgentPosition(self.index)
 
@@ -272,20 +310,15 @@ class defensiveAgent(CaptureAgent):
         distance = self.getMazeDistance(agentPosition, (self.dividingX, y))
         if distance < features['distanceToDividingLine']: features['distanceToDividingLine'] = distance
 
-    if self.isRed:
-      if agentPosition[0] >= self.dividingX: features['dividingLineCrossed'] = 1
-    else:
-      if agentPosition[0] < self.dividingX: features['dividingLineCrossed'] = 1
+    if not self.isOnOwnSide(currentGameState):
+      features['isOnEnemySide'] = 1
 
     # Loops through all enemies and sets 'distanceToGhost' equal to the lowest distance to a ghost
     for enemyAgent in self.getOpponents(currentGameState):
       enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
       if enemyAgentPosition is not None:
-        features['ghostNear'] = 1
         distanceToEnemyAgent = self.getMazeDistance(enemyAgentPosition, agentPosition)
-        if distanceToEnemyAgent < features['distanceToGhost']:
-          features['distanceToGhost'] = distanceToEnemyAgent
+        if distanceToEnemyAgent < features['distanceToEnemy']:
+          features['distanceToEnemy'] = distanceToEnemyAgent
 
     return features * weights
-
-

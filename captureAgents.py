@@ -244,6 +244,7 @@ class CaptureAgent(Agent):
     distancer object.
 
     If distancer.getMazeDistances() has been called, then maze distances are available.
+    If distancer.getMazeDistances() has been called, then maze distances are available.
     Otherwise, this just returns Manhattan distance.
     """
     d = self.distancer.getDistance(pos1, pos2)
