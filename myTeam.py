@@ -65,13 +65,15 @@ class offensiveAgent(CaptureAgent):
       0]  # Returns the wall with the highest X value
     self.layoutHeight = max(gameState.getWalls().asList(), key=lambda x: x[1])[
       1]  # Returns the wall with the highest Y value
-    self.middleX = round(self.layoutWidth / 2)  # Returns the X value of the diving line
-    self.middleY = round(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
 
     if self.isRed:
+      self.middleX = math.floor(self.layoutWidth / 2)  # Returns the X value of the diving line
+      self.middleY = math.floor(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
       self.patrolAreaX = (self.middleX - math.floor(self.layoutWidth * 0.35), self.middleX)
       self.patrolAreaY = (self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
     else:
+      self.middleX = math.ceil(self.layoutWidth / 2)  # Returns the X value of the diving line
+      self.middleY = math.ceil(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
       self.patrolAreaX = (self.middleX, self.middleX + math.ceil(self.layoutWidth * 0.35))
       self.patrolAreaY = (self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
 
@@ -151,9 +153,9 @@ class offensiveAgent(CaptureAgent):
 
   def isOnOwnSide(self, gameState):
     if self.isRed:
-      return gameState.getAgentPosition(self.index)[0] < self.middleX - 1
+      return gameState.getAgentPosition(self.index)[0] < self.middleX
     else:
-      return gameState.getAgentPosition(self.index)[0] > self.middleX + 1
+      return gameState.getAgentPosition(self.index)[0] > self.middleX
 
   def evaluationFunction(self, currentGameState):
     """
@@ -181,35 +183,30 @@ class offensiveAgent(CaptureAgent):
 
     if maxFood - foodLeft < 0: maxFood = foodLeft
 
-    if foodLeft > 2 and maxFood - foodLeft < 5 and hasBeenHome:
-      weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0, 'ghostNear': -100.0}
+    if foodLeft > 2 and maxFood - foodLeft < 3 and hasBeenHome:
+      weights = {'minimumFoodDistance': -1.0, 'foodLeft': -5.0, 'ghostDistance': 4.0}
 
       features = util.Counter()
 
       features['foodLeft'] = foodLeft
-      features['ghostNear'] = 0
+      features['ghostDistance'] = 20
 
       agentPosition = currentGameState.getAgentPosition(self.index)
-      features['minimumFoodDistance'] += min(
+      features['minimumFoodDistance'] = min(
         self.getMazeDistance(agentPosition, x) for x in self.getFood(currentGameState).asList())
 
       for enemyAgent in self.getOpponents(currentGameState):
         enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
         if enemyAgentPosition is not None:
-          if self.getMazeDistance(enemyAgentPosition, agentPosition) <= 4:
-            if self.isOnOwnSide(currentGameState):
-              weights = {'minimumFoodDistance': -0.1, 'foodLeft': -5.0,
-                         'ghostNear': -100.0}  # look for food, but definitely hunt for any enemies nearby.(when safely crossed the border ofc....)
-            else:
-              weights = {'minimumFoodDistance': -0.0, 'foodLeft': -0.0,
-                         'ghostNear': -100.0}  # prioritize your life over food, so you don't get caught in dead ends.
-            features['ghostNear'] = 1
+          enemyDistance = self.getMazeDistance(enemyAgentPosition, agentPosition)
+          if enemyDistance < features['ghostDistance']:
+            features['ghostDistance'] = enemyDistance
 
       return features * weights
 
     # Go home to return the food
     else:
-      weights = {'distanceToHome': -1.0, 'distanceToGhost': -50.0}
+      weights = {'distanceToHome': -1.0, 'distanceToGhost': -5.0}
       features = util.Counter()
 
       features['distanceToHome'] = self.getMazeDistance(currentGameState.getAgentPosition(self.index),
@@ -241,15 +238,19 @@ class defensiveAgent(CaptureAgent):
 
     self.layoutWidth = max(gameState.getWalls().asList(), key=lambda x: x[0])[0]  # Returns the wall with the highest X value
     self.layoutHeight = max(gameState.getWalls().asList(), key=lambda x: x[1])[1]  # Returns the wall with the highest Y value
-    self.middleX = round(self.layoutWidth / 2)  # Returns the X value of the diving line
-    self.middleY = round(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
 
     if self.isRed:
+      self.middleX = math.floor(self.layoutWidth / 2)  # Returns the X value of the diving line
+      self.middleY = math.floor(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
       self.patrolAreaX = (self.middleX - math.floor(self.layoutWidth * 0.35), self.middleX)
-      self.patrolAreaY = (self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
+      self.patrolAreaY = (
+      self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
     else:
+      self.middleX = math.ceil(self.layoutWidth / 2)  # Returns the X value of the diving line
+      self.middleY = math.ceil(self.layoutHeight / 2)  # Returns the Y value of the imaginary diving Y line
       self.patrolAreaX = (self.middleX, self.middleX + math.ceil(self.layoutWidth * 0.35))
-      self.patrolAreaY = (self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
+      self.patrolAreaY = (
+      self.middleY - math.floor(self.layoutHeight * 0.35), self.middleY + math.ceil(self.layoutHeight * 0.35))
 
     CaptureAgent.registerInitialState(self, gameState)
 
