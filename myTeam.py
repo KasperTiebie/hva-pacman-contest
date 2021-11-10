@@ -134,6 +134,7 @@ class offensiveAgent(CaptureAgent):
     alpha = float('-inf')  # -inf
     beta = float('inf')  # +inf
 
+    #start = time.time()
     for action in gameState.getLegalActions(self.index):
       successor = gameState.generateSuccessor(self.index, action)
       if self.index is not gameState.getNumAgents():
@@ -148,6 +149,7 @@ class offensiveAgent(CaptureAgent):
       elif value == alpha:
         bestActions.append(action)
 
+    #print('eval time for agent %d: %.4f' % (self.index, time.time() - start))
     return random.choice(bestActions)
 
   def isOnOwnSide(self, gameState):
@@ -177,7 +179,7 @@ class offensiveAgent(CaptureAgent):
 
     # Collect more food if the foodLeft is > 2 and the agent isn't holding more than 2 food
     if foodLeft > 2 and foodCarrying < 2:
-      weights = {'minimumFoodDistance': -1.0, 'foodLeft': -5.0, 'ghostDistance': 4.0, 'foodReturned': 50.0}
+      weights = {'minimumFoodDistance': -1.0, 'foodLeft': -10.0, 'ghostDistance': 4.0, 'foodReturned': 50.0}
       features = util.Counter()
 
       features['foodReturned'] = foodReturned
@@ -298,7 +300,7 @@ class defensiveAgent(CaptureAgent):
     alpha = float('-inf')  # -inf
     beta = float('inf')  # +inf
 
-    start = time.time()
+    #start = time.time()
     for action in gameState.getLegalActions(self.index):
       successor = gameState.generateSuccessor(self.index, action)
       if self.index is not gameState.getNumAgents():
@@ -313,7 +315,7 @@ class defensiveAgent(CaptureAgent):
       elif value == alpha:
         bestActions.append(action)
 
-    print('eval time for agent %d: %.4f' % (self.index, time.time() - start))
+    #print('eval time for agent %d: %.4f' % (self.index, time.time() - start))
     return random.choice(bestActions)
 
   def isOnOwnSide(self, gameState):
@@ -340,15 +342,14 @@ class defensiveAgent(CaptureAgent):
         return 1000000  # Make sure that happens by returning a high value
 
     weights = {'foodDefendingLeft': 50, 'distanceToEnemy': -5.0, 'isOnEnemySide': -10000,
-               'distanceToPatrolAreaX': -1.0, 'distanceToPatrolAreaY': -1.0, 'distanceToPatrolArea': -1.0}
+               'distanceToPatrolArea': -1.0}
     features = util.Counter()
 
     features['foodDefendingLeft'] = foodDefendingLeft
     features['distanceToPatrolArea'] = float('inf')
-    #features['distanceToPatrolAreaX'] = float('inf')
-    #features['distanceToPatrolAreaY'] = float('inf')
     features['distanceToEnemy'] = 20
 
+    # If the agent is outside of the patrol area, set 'distanceToPatrolArea' equal to the minimum distance to the patrol area
     if agentPosition[0] < self.patrolAreaX[0] or agentPosition[0] > self.patrolAreaX[1] or agentPosition[1] < self.patrolAreaY[0] or agentPosition[1] > self.patrolAreaY[1]:
       for y in range(self.patrolAreaY[0], self.patrolAreaY[1]):
         if not currentGameState.hasWall(self.patrolAreaX[0], y):
@@ -367,32 +368,6 @@ class defensiveAgent(CaptureAgent):
           if distance < features['distanceToPatrolArea']: features['distanceToPatrolArea'] = distance
     else:
       features['distanceToPatrolArea'] = 0
-
-    # # If the agent is outside of the X patrol area
-    # if agentPosition[0] < self.patrolAreaX[0] or agentPosition[0] > self.patrolAreaX[1]:
-    #   for y in range(self.patrolAreaY[0], self.patrolAreaY[1]):
-    #     if not currentGameState.hasWall(self.patrolAreaX[0], y):
-    #       distance = self.getMazeDistance(agentPosition, (self.patrolAreaX[0], y))
-    #       if distance < features['distanceToPatrolAreaX']: features['distanceToPatrolAreaX'] = distance
-    #     if not currentGameState.hasWall(self.patrolAreaX[1], y):
-    #       distance = self.getMazeDistance(agentPosition, (self.patrolAreaX[1], y))
-    #       if distance < features['distanceToPatrolAreaX']: features['distanceToPatrolAreaX'] = distance
-    # else:
-    #   features['distanceToPatrolAreaX'] = 0
-    #
-    # # If the agent is outside of the Y patrol area
-    # print(agentPosition[1])
-    # if (agentPosition[1] < self.patrolAreaY[0] and agentPosition[0] > self.patrolAreaX[0] and agentPosition[0] < self.patrolAreaX[1]) or\
-    #         (agentPosition[1] > self.patrolAreaY[1] and agentPosition[0] > self.patrolAreaX[0] and agentPosition[0] < self.patrolAreaX[1]):
-    #   for x in range(self.patrolAreaX[0], self.patrolAreaX[1]):
-    #     if not currentGameState.hasWall(x, self.patrolAreaY[0]):
-    #       distance = self.getMazeDistance(agentPosition, (x, self.patrolAreaY[0]))
-    #       if distance < features['distanceToPatrolAreaY']: features['distanceToPatrolAreaY'] = distance
-    #     if not currentGameState.hasWall(x, self.patrolAreaY[1]):
-    #       distance = self.getMazeDistance(agentPosition, (x, self.patrolAreaY[1]))
-    #       if distance < features['distanceToPatrolAreaY']: features['distanceToPatrolAreaY'] = distance
-    # else:
-    #   features['distanceToPatrolAreaY'] = 0
 
     if not self.isOnOwnSide(currentGameState):
       features['isOnEnemySide'] = 1
