@@ -177,10 +177,11 @@ class offensiveAgent(CaptureAgent):
         return -1000000  # Make sure that doesn't happen by returning a low value
 
     # Collect more food if the foodLeft is > 2 and the agent isn't holding more than 2 food
+    print(int(not isPacman))
     weights = weights = {'distanceToHome': -0.2*foodCarrying,
                          'minimumFoodDistance': -1.0/(1+foodCarrying/2),
                          'foodLeft': -10.0,
-                         'ghostDistance': 2.5/(1+int(not isPacman)),
+                         'ghostDistance': 0.2,
                          'foodCarrying': 22.0 + (foodReturned * 1),
                          'foodReturned': 22.0 + (foodReturned * 2)}
     features = util.Counter()
