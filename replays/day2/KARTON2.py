@@ -180,8 +180,8 @@ class offensiveAgent(CaptureAgent):
     weights = weights = {'distanceToHome': -0.2*foodCarrying,
                          'minimumFoodDistance': -1.0/(1+foodCarrying/2),
                          'foodLeft': -10.0,
-                         'ghostDistance': 2.5/(1+int(not isPacman)),
-                         'foodCarrying': 22.0 + (foodReturned * 1),
+                         'ghostDistance': 2.5,
+                         'foodCarrying': 22+(foodReturned * 1),
                          'foodReturned': 22.0 + (foodReturned * 2)}
     features = util.Counter()
     features['foodReturned'] = foodReturned
@@ -192,13 +192,13 @@ class offensiveAgent(CaptureAgent):
     features['minimumFoodDistance'] = min(
       self.getMazeDistance(agentPosition, x) for x in self.getFood(currentGameState).asList())
 
-    #if isPacman:
-    for enemyAgent in self.getOpponents(currentGameState):
-      enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
-      if enemyAgentPosition is not None:
-        enemyDistance = self.getMazeDistance(enemyAgentPosition, agentPosition)
-        if enemyDistance < features['ghostDistance']:
-          features['ghostDistance'] = enemyDistance
+    if isPacman:
+      for enemyAgent in self.getOpponents(currentGameState):
+        enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
+        if enemyAgentPosition is not None:
+          enemyDistance = self.getMazeDistance(enemyAgentPosition, agentPosition)
+          if enemyDistance < features['ghostDistance']:
+            features['ghostDistance'] = enemyDistance
 
     features['distanceToHome'] = self.getMazeDistance(currentGameState.getAgentPosition(self.index),
                                                       currentGameState.getInitialAgentPosition(self.index))

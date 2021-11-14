@@ -11,7 +11,7 @@
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
-CONTACT = "kasper@kaspertiebie.com,artonschenk@icloud.com"
+CONTACT = "kasper@kaspertiebie.com"
 
 from captureAgents import CaptureAgent
 import random, time, util, math
@@ -177,11 +177,11 @@ class offensiveAgent(CaptureAgent):
         return -1000000  # Make sure that doesn't happen by returning a low value
 
     # Collect more food if the foodLeft is > 2 and the agent isn't holding more than 2 food
-    weights = weights = {'distanceToHome': -0.2*foodCarrying,
-                         'minimumFoodDistance': -1.0/(1+foodCarrying/2),
+    weights = weights = {'distanceToHome': -0.3*foodCarrying,
+                         'minimumFoodDistance': -1.0/(1+foodCarrying),
                          'foodLeft': -10.0,
-                         'ghostDistance': 2.5/(1+int(not isPacman)),
-                         'foodCarrying': 22.0 + (foodReturned * 1),
+                         'ghostDistance': 3.0,
+                         'foodCarrying': 22+(foodReturned * 1),
                          'foodReturned': 22.0 + (foodReturned * 2)}
     features = util.Counter()
     features['foodReturned'] = foodReturned
@@ -192,13 +192,13 @@ class offensiveAgent(CaptureAgent):
     features['minimumFoodDistance'] = min(
       self.getMazeDistance(agentPosition, x) for x in self.getFood(currentGameState).asList())
 
-    #if isPacman:
-    for enemyAgent in self.getOpponents(currentGameState):
-      enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
-      if enemyAgentPosition is not None:
-        enemyDistance = self.getMazeDistance(enemyAgentPosition, agentPosition)
-        if enemyDistance < features['ghostDistance']:
-          features['ghostDistance'] = enemyDistance
+    if isPacman:
+      for enemyAgent in self.getOpponents(currentGameState):
+        enemyAgentPosition = currentGameState.getAgentPosition(enemyAgent)
+        if enemyAgentPosition is not None:
+          enemyDistance = self.getMazeDistance(enemyAgentPosition, agentPosition)
+          if enemyDistance < features['ghostDistance']:
+            features['ghostDistance'] = enemyDistance
 
     features['distanceToHome'] = self.getMazeDistance(currentGameState.getAgentPosition(self.index),
                                                       currentGameState.getInitialAgentPosition(self.index))
